@@ -1,0 +1,18 @@
+# Mengunci file environment rahasia agar tidak bocor ke publik
+.env
+.env.local
+
+# Membuang file binary hasil compile lokal (Windows & Linux)
+*.exe
+*.exe~
+main
+helpdesk_backend
+
+# Membuang folder sampah bawaan VS Code dan JetBrains IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
