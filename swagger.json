@@ -1,0 +1,806 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Helpdesk E-Ticketing API",
+    "description": "REST API untuk Sistem E-Ticketing Helpdesk & IT Support.\n\n**Teknologi:**\n- Backend: Golang (Gin Framework)\n- Database: Supabase PostgreSQL\n- Auth: Supabase Auth (JWT)\n\n**RBAC Roles:**\n- `admin` — Akses penuh, termasuk delete tiket & manajemen user\n- `helpdesk` — Akses tiket yang di-assign & komentar\n- `user` — Akses tiket yang dibuat sendiri\n\n**Cara Mendapatkan Token:**\n1. POST ke `{supabase_url}/auth/v1/token?grant_type=password` dengan email & password\n2. Ambil `access_token` dari response\n3. Gunakan di header: `Authorization: Bearer {access_token}`",
+    "version": "2.0.0",
+    "contact": {
+      "name": "M. Arviansyah Desta Andini",
+      "email": "admin@helpdesk.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://helpdeskbackend-production-780c.up.railway.app",
+      "description": "Production Server (Railway)"
+    },
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health Check",
+      "description": "Endpoint publik untuk cek status server"
+    },
+    {
+      "name": "Tickets",
+      "description": "CRUD operasi tiket dengan RBAC filtering"
+    },
+    {
+      "name": "Comments",
+      "description": "Komentar/komunikasi di dalam tiket"
+    },
+    {
+      "name": "Ticket Histories",
+      "description": "Riwayat aktivitas tiket (Audit Trail)"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Statistik tiket untuk dashboard"
+    },
+    {
+      "name": "User Management",
+      "description": "Manajemen pengguna (Admin Only)"
+    },
+    {
+      "name": "Password Reset",
+      "description": "Reset password pengguna (Public)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Token dari Supabase Auth. Dapatkan melalui login di Supabase Auth API."
+      }
+    },
+    "schemas": {
+      "Ticket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID tiket",
+            "example": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          },
+          "title": {
+            "type": "string",
+            "description": "Judul keluhan/masalah",
+            "example": "Printer lantai 3 tidak bisa print"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detail penjelasan keluhan",
+            "example": "Printer HP LaserJet di ruang meeting lantai 3 error code 49"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "in_progress", "resolved", "closed"],
+            "description": "Status tiket",
+            "example": "open"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Prioritas tiket",
+            "example": "high"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID pelapor (diisi otomatis dari JWT)",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "assigned_to": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID teknisi yang ditunjuk (nullable)",
+            "example": "d4e5f6a7-b8c9-0123-defa-234567890123"
+          },
+          "attachment_url": {
+            "type": "string",
+            "description": "URL file lampiran di Supabase Storage",
+            "example": "https://chqperxbnbgsyeldptfk.supabase.co/storage/v1/object/public/attachments/error.jpg"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-05T10:30:00+07:00"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-05T10:30:00+07:00"
+          }
+        }
+      },
+      "TicketCreate": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Judul keluhan/masalah",
+            "example": "Aplikasi E-Faktur Error"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detail penjelasan keluhan",
+            "example": "Tidak bisa generate PDF di aplikasi e-faktur"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "default": "medium",
+            "example": "high"
+          },
+          "attachment_url": {
+            "type": "string",
+            "description": "URL file lampiran (opsional)",
+            "example": ""
+          }
+        }
+      },
+      "TicketUpdate": {
+        "type": "object",
+        "properties": {
+          "assigned_to": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID teknisi yang ditunjuk",
+            "example": "d4e5f6a7-b8c9-0123-defa-234567890123"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "in_progress", "resolved", "closed"],
+            "description": "Status baru tiket",
+            "example": "in_progress"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "example": "high"
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "c1111111-2222-3333-4444-555555555555"
+          },
+          "ticket_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          },
+          "author_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "d4e5f6a7-b8c9-0123-defa-234567890123"
+          },
+          "content": {
+            "type": "string",
+            "description": "Isi pesan komentar",
+            "example": "Sedang dalam perjalanan ke lantai 3 untuk cek printer."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-05T11:00:00+07:00"
+          }
+        }
+      },
+      "CommentCreate": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Isi pesan komentar",
+            "example": "Sudah dicek, masalahnya di cartridge toner."
+          }
+        }
+      },
+      "TicketHistory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "h1111111-2222-3333-4444-555555555555"
+          },
+          "ticket_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          },
+          "action": {
+            "type": "string",
+            "description": "Deskripsi aktivitas",
+            "example": "Status changed from 'open' to 'in_progress'"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-05T11:00:00+07:00"
+          }
+        }
+      },
+      "DashboardStats": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "integer",
+            "example": 5
+          },
+          "in_progress": {
+            "type": "integer",
+            "example": 3
+          },
+          "resolved": {
+            "type": "integer",
+            "example": 12
+          },
+          "total": {
+            "type": "integer",
+            "example": 20
+          }
+        }
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "username": {
+            "type": "string",
+            "description": "Email login",
+            "example": "admin@helpdesk.com"
+          },
+          "full_name": {
+            "type": "string",
+            "example": "Admin Helpdesk"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "helpdesk", "admin"],
+            "example": "admin"
+          },
+          "is_active": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Tiket tidak ditemukan"
+          }
+        }
+      },
+      "DeleteResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Tiket berhasil dihapus"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/ping": {
+      "get": {
+        "tags": ["Health Check"],
+        "summary": "Health Check Backend",
+        "description": "Endpoint publik untuk memverifikasi server aktif. Tidak memerlukan autentikasi.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Server aktif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Backend Helpdesk v2.0.0 Ready!"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "2.0.0"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "Ambil Daftar Tiket (RBAC Filtered)",
+        "description": "Mengambil daftar tiket dengan RBAC filtering:\n- **admin** → semua tiket tanpa filter\n- **helpdesk** → tiket yang di-assign kepadanya\n- **user** → tiket yang dibuat sendiri\n\nHasil diurutkan berdasarkan created_at descending (terbaru di atas).",
+        "operationId": "getTickets",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Array tiket berhasil diambil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Ticket" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token tidak valid atau expired",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Buat Tiket Baru",
+        "description": "Membuat tiket baru. Field `created_by` otomatis diisi dari JWT token.\nStatus default: `open`.\nOtomatis mencatat history: 'Ticket created with status open'.",
+        "operationId": "createTicket",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TicketCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tiket berhasil dibuat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Ticket" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body tidak valid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/tickets/{id}": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "Ambil Detail Satu Tiket",
+        "description": "Mengambil detail satu tiket berdasarkan UUID.",
+        "operationId": "getTicketByID",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail tiket",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Ticket" }
+              }
+            }
+          },
+          "404": {
+            "description": "Tiket tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Tickets"],
+        "summary": "Update Tiket (Assign Staff / Ubah Status)",
+        "description": "Mengupdate data tiket. Otomatis mencatat perubahan ke ticket_histories:\n- Jika `status` berubah → 'Status changed from X to Y'\n- Jika `assigned_to` berubah → 'Ticket assigned to Z'",
+        "operationId": "updateTicket",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket yang akan diupdate",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TicketUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tiket berhasil diupdate",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Ticket" }
+              }
+            }
+          },
+          "404": {
+            "description": "Tiket tidak ditemukan"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Tickets"],
+        "summary": "Hapus Tiket (Admin Only)",
+        "description": "Menghapus tiket dari database. Dilindungi oleh **RoleGuard('admin')**.\nCascade delete otomatis menghapus comments dan histories terkait.",
+        "operationId": "deleteTicket",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket yang akan dihapus",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tiket berhasil dihapus",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DeleteResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Akses ditolak (bukan admin)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "error": "Akses ditolak: role 'user' tidak memiliki izin untuk endpoint ini"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tiket tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/tickets/{id}/comments": {
+      "get": {
+        "tags": ["Comments"],
+        "summary": "Ambil Komentar Tiket",
+        "description": "Mengambil semua komentar untuk sebuah tiket, diurutkan kronologis (terlama dulu).",
+        "operationId": "getComments",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array komentar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Comment" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Comments"],
+        "summary": "Tambah Komentar + Auto-Log",
+        "description": "Menambahkan komentar baru pada tiket.\nOtomatis mencatat ke ticket_histories: 'Comment added by {username}'.",
+        "operationId": "createComment",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CommentCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Komentar berhasil dibuat",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Comment" }
+              }
+            }
+          },
+          "404": {
+            "description": "Tiket tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/tickets/{id}/histories": {
+      "get": {
+        "tags": ["Ticket Histories"],
+        "summary": "Ambil Riwayat Aktivitas Tiket",
+        "description": "Mengambil seluruh riwayat aktivitas pada sebuah tiket (Audit Trail / BR-005).\nData diurutkan kronologis (terlama di atas) untuk visualisasi timeline.",
+        "operationId": "getTicketHistories",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID tiket",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array riwayat aktivitas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/TicketHistory" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Statistik Tiket Global",
+        "description": "Mengembalikan statistik jumlah tiket berdasarkan status.\nData di-filter sesuai RBAC:\n- **admin** → statistik seluruh tiket\n- **helpdesk** → statistik tiket yang di-assign\n- **user** → statistik tiket yang dibuat sendiri",
+        "operationId": "getDashboardStats",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Statistik dashboard",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DashboardStats" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "tags": ["User Management"],
+        "summary": "Daftar Seluruh Pengguna (Admin Only)",
+        "description": "Mengambil daftar semua pengguna dari tabel profiles.\nDiurutkan berdasarkan full_name.\nDilindungi **RoleGuard('admin')**.",
+        "operationId": "getAllUsers",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Array profile pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Profile" }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Akses ditolak (bukan admin)"
+          }
+        }
+      }
+    },
+    "/users/helpdesk": {
+      "get": {
+        "tags": ["User Management"],
+        "summary": "Daftar Teknisi Helpdesk (Admin Only)",
+        "description": "Mengambil daftar user dengan role 'helpdesk' saja.\nDigunakan untuk dialog Assign Staff di aplikasi Flutter.\nDilindungi **RoleGuard('admin')**.",
+        "operationId": "getHelpdeskUsers",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Array profile teknisi helpdesk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Profile" }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Akses ditolak (bukan admin)"
+          }
+        }
+      }
+    },
+    "/users/{id}/status": {
+      "patch": {
+        "tags": ["User Management"],
+        "summary": "Toggle Aktif/Nonaktif Pengguna (Admin Only)",
+        "description": "Toggle status is_active pengguna.\nJika is_active=false, user diblokir di JWT Middleware.\nDilindungi **RoleGuard('admin')**.",
+        "operationId": "toggleUserStatus",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "UUID pengguna",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["is_active"],
+                "properties": {
+                  "is_active": {
+                    "type": "boolean",
+                    "description": "Status aktif pengguna",
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status pengguna berhasil diupdate",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Profile" }
+              }
+            }
+          },
+          "404": {
+            "description": "Pengguna tidak ditemukan"
+          }
+        }
+      }
+    },
+    "/users/reset-password": {
+      "post": {
+        "tags": ["Password Reset"],
+        "summary": "Reset Password (Public)",
+        "description": "Bypass reset password menggunakan Supabase Admin API.\nEndpoint ini **Public** (tidak memerlukan JWT).",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "new_password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email pengguna",
+                    "example": "user@helpdesk.com"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "description": "Password baru",
+                    "example": "newpassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password berhasil di-reset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password berhasil di-reset"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Email tidak ditemukan"
+          }
+        }
+      }
+    }
+  }
+}

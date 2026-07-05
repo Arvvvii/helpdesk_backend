@@ -1,0 +1,685 @@
+{
+  "info": {
+    "_postman_id": "helpdesk-eticketing-v2",
+    "name": "Helpdesk E-Ticketing API v2.0.0",
+    "description": "Dokumentasi REST API lengkap untuk Sistem E-Ticketing Helpdesk & IT Support.\n\nBackend: Golang (Gin Framework)\nDatabase: Supabase PostgreSQL\nAuth: Supabase Auth (JWT)\n\nFlow:\n1. Login via Supabase Auth → Dapatkan access_token\n2. Gunakan token di Header Authorization: Bearer <access_token>\n3. Akses endpoint sesuai role (user/helpdesk/admin)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://helpdeskbackend-production-780c.up.railway.app",
+      "type": "string"
+    },
+    {
+      "key": "supabase_url",
+      "value": "https://chqperxbnbgsyeldptfk.supabase.co",
+      "type": "string"
+    },
+    {
+      "key": "supabase_anon_key",
+      "value": "YOUR_SUPABASE_ANON_KEY",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticket_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "helpdesk_user_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication (Supabase Auth)",
+      "description": "Endpoint autentikasi menggunakan Supabase Auth API langsung.",
+      "item": [
+        {
+          "name": "a. Login Admin (Memperoleh JWT Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('admin_token', jsonData.access_token);",
+                  "    console.log('✅ Token berhasil disimpan ke variable admin_token');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{supabase_anon_key}}",
+                "description": "Supabase Anon Key (wajib untuk akses Supabase Auth API)"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@helpdesk.com\",\n  \"password\": \"admin123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
+              "host": ["{{supabase_url}}"],
+              "path": ["auth", "v1", "token"],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                }
+              ]
+            },
+            "description": "Login ke Supabase Auth untuk mendapatkan JWT access_token.\n\nGanti email & password sesuai akun admin yang sudah terdaftar di Supabase.\n\nResponse berisi:\n- access_token (JWT untuk header Authorization)\n- refresh_token\n- user object"
+          },
+          "response": [
+            {
+              "name": "200 OK — Login Berhasil",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{supabase_url}}/auth/v1/token?grant_type=password"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx\",\n  \"token_type\": \"bearer\",\n  \"expires_in\": 3600,\n  \"expires_at\": 1751760000,\n  \"refresh_token\": \"xxxxx-refresh-token-xxxxx\",\n  \"user\": {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"email\": \"admin@helpdesk.com\",\n    \"role\": \"authenticated\",\n    \"created_at\": \"2026-01-15T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login User Biasa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('user_token', jsonData.access_token);",
+                  "    console.log('✅ User token disimpan');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{supabase_anon_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@helpdesk.com\",\n  \"password\": \"user123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{supabase_url}}/auth/v1/token?grant_type=password",
+              "host": ["{{supabase_url}}"],
+              "path": ["auth", "v1", "token"],
+              "query": [
+                {
+                  "key": "grant_type",
+                  "value": "password"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "GET /ping (Public — No Auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/ping",
+              "host": ["{{base_url}}"],
+              "path": ["ping"]
+            },
+            "description": "Endpoint health check backend. Tidak memerlukan autentikasi.\n\nDigunakan untuk memverifikasi bahwa server Golang aktif."
+          },
+          "response": [
+            {
+              "name": "200 OK — Server Ready",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"message\": \"Backend Helpdesk v2.0.0 Ready!\",\n  \"version\": \"2.0.0\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🎫 Tickets (CRUD + RBAC)",
+      "description": "Endpoint CRUD tiket dengan Role-Based Access Control.\n\nRBAC Filtering pada GET /tickets:\n- admin → semua tiket\n- helpdesk → tiket yang di-assign\n- user → tiket yang dibuat sendiri",
+      "item": [
+        {
+          "name": "b. GET /tickets (Role Admin — Tanpa Filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "description": "JWT Token dari login admin"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["tickets"]
+            },
+            "description": "Mengambil seluruh tiket. Admin melihat semua tiket tanpa filter RBAC.\n\nResponse: Array of Ticket objects, diurutkan terbaru di atas."
+          },
+          "response": [
+            {
+              "name": "200 OK — Array Ticket (Admin)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"title\": \"Printer lantai 3 tidak bisa print\",\n    \"description\": \"Printer HP LaserJet di ruang meeting lantai 3 error code 49\",\n    \"status\": \"open\",\n    \"priority\": \"high\",\n    \"created_by\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"assigned_to\": \"\",\n    \"attachment_url\": \"https://chqperxbnbgsyeldptfk.supabase.co/storage/v1/object/public/attachments/printer_error.jpg\",\n    \"created_at\": \"2026-07-05T10:30:00+07:00\",\n    \"updated_at\": \"2026-07-05T10:30:00+07:00\"\n  },\n  {\n    \"id\": \"b2c3d4e5-f6a7-8901-bcde-f12345678901\",\n    \"title\": \"Tidak bisa akses email kantor\",\n    \"description\": \"Outlook terus minta password, sudah reset tetap gagal\",\n    \"status\": \"in_progress\",\n    \"priority\": \"medium\",\n    \"created_by\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"assigned_to\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"created_at\": \"2026-07-04T14:00:00+07:00\",\n    \"updated_at\": \"2026-07-05T09:15:00+07:00\"\n  },\n  {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-345678901234\",\n    \"title\": \"Request install aplikasi AutoCAD\",\n    \"description\": \"Butuh AutoCAD 2024 untuk project arsitektur\",\n    \"status\": \"resolved\",\n    \"priority\": \"low\",\n    \"created_by\": \"e5f6a7b8-c9d0-1234-efab-456789012345\",\n    \"assigned_to\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"created_at\": \"2026-07-03T08:00:00+07:00\",\n    \"updated_at\": \"2026-07-04T16:30:00+07:00\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "GET /tickets/:id (Detail Satu Tiket)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}"]
+            },
+            "description": "Mengambil detail satu tiket berdasarkan UUID."
+          },
+          "response": [
+            {
+              "name": "200 OK — Ticket Detail",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"title\": \"Printer lantai 3 tidak bisa print\",\n  \"description\": \"Printer HP LaserJet di ruang meeting lantai 3 error code 49\",\n  \"status\": \"open\",\n  \"priority\": \"high\",\n  \"created_by\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"assigned_to\": \"\",\n  \"attachment_url\": \"https://chqperxbnbgsyeldptfk.supabase.co/storage/v1/object/public/attachments/printer_error.jpg\",\n  \"created_at\": \"2026-07-05T10:30:00+07:00\",\n  \"updated_at\": \"2026-07-05T10:30:00+07:00\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Tiket tidak ditemukan\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /tickets (Buat Tiket Baru)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Aplikasi E-Faktur Error\",\n  \"description\": \"Tidak bisa generate PDF di aplikasi e-faktur, muncul error NullPointerException\",\n  \"priority\": \"high\",\n  \"attachment_url\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["tickets"]
+            },
+            "description": "Membuat tiket baru. Field 'created_by' otomatis diisi dari JWT token.\nStatus default: 'open'.\n\nOtomatis mencatat history: 'Ticket created with status open'."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"a1234567-b890-cdef-1234-567890abcdef\",\n  \"title\": \"Aplikasi E-Faktur Error\",\n  \"description\": \"Tidak bisa generate PDF di aplikasi e-faktur, muncul error NullPointerException\",\n  \"status\": \"open\",\n  \"priority\": \"high\",\n  \"created_by\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"attachment_url\": \"\",\n  \"created_at\": \"2026-07-05T21:00:00+07:00\",\n  \"updated_at\": \"2026-07-05T21:00:00+07:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "c. PUT /tickets/:id (Assign Staff oleh Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assigned_to\": \"{{helpdesk_user_id}}\",\n  \"status\": \"in_progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}"]
+            },
+            "description": "Update tiket: assign staff dan ubah status.\n\nOtomatis mencatat ke ticket_histories:\n- \"Status changed from 'open' to 'in_progress'\"\n- \"Ticket assigned to '<helpdesk_user_id>'\""
+          },
+          "response": [
+            {
+              "name": "200 OK — Ticket Updated",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"title\": \"Printer lantai 3 tidak bisa print\",\n  \"description\": \"Printer HP LaserJet di ruang meeting lantai 3 error code 49\",\n  \"status\": \"in_progress\",\n  \"priority\": \"high\",\n  \"created_by\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"assigned_to\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n  \"attachment_url\": \"https://chqperxbnbgsyeldptfk.supabase.co/storage/v1/object/public/attachments/printer_error.jpg\",\n  \"created_at\": \"2026-07-05T10:30:00+07:00\",\n  \"updated_at\": \"2026-07-05T21:05:00+07:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "d. DELETE /tickets/:id (Admin Only — RoleGuard)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "description": "Hanya admin yang bisa menghapus tiket"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}"]
+            },
+            "description": "Menghapus tiket. Dilindungi oleh RoleGuard('admin').\nCascade delete otomatis menghapus comments dan histories terkait."
+          },
+          "response": [
+            {
+              "name": "200 OK — Tiket Dihapus",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"message\": \"Tiket berhasil dihapus\",\n  \"id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\"\n}"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Akses ditolak: role 'user' tidak memiliki izin untuk endpoint ini\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Tiket tidak ditemukan\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "💬 Comments (Tiket)",
+      "description": "Endpoint untuk komentar/komunikasi di dalam tiket.",
+      "item": [
+        {
+          "name": "GET /tickets/:id/comments (Ambil Komentar Tiket)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "comments"]
+            },
+            "description": "Mengambil semua komentar untuk sebuah tiket, diurutkan kronologis (terlama dulu)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Array Comments",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"c1111111-2222-3333-4444-555555555555\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"author_id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"content\": \"Sedang dalam perjalanan ke lantai 3 untuk cek printer.\",\n    \"created_at\": \"2026-07-05T11:00:00+07:00\"\n  },\n  {\n    \"id\": \"c2222222-3333-4444-5555-666666666666\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"author_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"content\": \"Terima kasih, saya tunggu di ruang meeting.\",\n    \"created_at\": \"2026-07-05T11:05:00+07:00\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "POST /tickets/:id/comments (Tambah Komentar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Sudah dicek, masalahnya di cartridge toner. Sedang proses penggantian.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "comments"]
+            },
+            "description": "Menambahkan komentar baru pada tiket.\nOtomatis mencatat ke ticket_histories: 'Comment added by <username>'."
+          },
+          "response": [
+            {
+              "name": "201 Created — Komentar Dibuat",
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"c3333333-4444-5555-6666-777777777777\",\n  \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n  \"author_id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n  \"content\": \"Sudah dicek, masalahnya di cartridge toner. Sedang proses penggantian.\",\n  \"created_at\": \"2026-07-05T11:30:00+07:00\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📜 Ticket Histories (Tracking)",
+      "description": "Endpoint riwayat aktivitas tiket (Audit Trail / BR-005).",
+      "item": [
+        {
+          "name": "GET /tickets/:id/histories (Riwayat Aktivitas Tiket)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tickets/{{ticket_id}}/histories",
+              "host": ["{{base_url}}"],
+              "path": ["tickets", "{{ticket_id}}", "histories"]
+            },
+            "description": "Mengambil seluruh riwayat aktivitas pada sebuah tiket.\nDigunakan untuk fitur Timeline/Tracking (BR-005).\nData diurutkan kronologis (terlama di atas)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Array Histories",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"h1111111-2222-3333-4444-555555555555\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"action\": \"Ticket created with status 'open'\",\n    \"actor_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"created_at\": \"2026-07-05T10:30:00+07:00\"\n  },\n  {\n    \"id\": \"h2222222-3333-4444-5555-666666666666\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"action\": \"Status changed from 'open' to 'in_progress'\",\n    \"actor_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"created_at\": \"2026-07-05T11:00:00+07:00\"\n  },\n  {\n    \"id\": \"h3333333-4444-5555-6666-777777777777\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"action\": \"Ticket assigned to 'd4e5f6a7-b8c9-0123-defa-234567890123'\",\n    \"actor_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"created_at\": \"2026-07-05T11:00:00+07:00\"\n  },\n  {\n    \"id\": \"h4444444-5555-6666-7777-888888888888\",\n    \"ticket_id\": \"f47ac10b-58cc-4372-a567-0e02b2c3d479\",\n    \"action\": \"Comment added by Budi IT Support\",\n    \"actor_id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"created_at\": \"2026-07-05T11:30:00+07:00\"\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 Dashboard",
+      "description": "Endpoint statistik dashboard.",
+      "item": [
+        {
+          "name": "GET /dashboard/stats (Statistik Global)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/stats",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "stats"]
+            },
+            "description": "Mengambil statistik jumlah tiket berdasarkan status.\nData di-filter sesuai RBAC (admin melihat seluruh statistik)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Dashboard Stats",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"open\": 5,\n  \"in_progress\": 3,\n  \"resolved\": 12,\n  \"total\": 20\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "👥 User Management (Admin Only)",
+      "description": "Endpoint manajemen pengguna. Semua endpoint dilindungi RoleGuard('admin').",
+      "item": [
+        {
+          "name": "GET /users (Daftar Seluruh Pengguna)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "description": "Hanya admin yang bisa mengakses"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            },
+            "description": "Mengambil daftar semua pengguna dari tabel profiles.\nDiurutkan berdasarkan full_name.\nDilindungi RoleGuard('admin')."
+          },
+          "response": [
+            {
+              "name": "200 OK — Array Profile",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n    \"username\": \"admin@helpdesk.com\",\n    \"full_name\": \"Admin Helpdesk\",\n    \"role\": \"admin\",\n    \"is_active\": true\n  },\n  {\n    \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"username\": \"budi@helpdesk.com\",\n    \"full_name\": \"Budi IT Support\",\n    \"role\": \"helpdesk\",\n    \"is_active\": true\n  },\n  {\n    \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n    \"username\": \"dewi@company.com\",\n    \"full_name\": \"Dewi Sartika\",\n    \"role\": \"user\",\n    \"is_active\": true\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "e. GET /users/helpdesk (Daftar Teknisi — Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "description": "Hanya admin yang bisa mengakses"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/helpdesk",
+              "host": ["{{base_url}}"],
+              "path": ["users", "helpdesk"]
+            },
+            "description": "Mengambil daftar user dengan role 'helpdesk' saja.\nDigunakan untuk dialog Assign Staff di aplikasi Flutter.\nDilindungi RoleGuard('admin')."
+          },
+          "response": [
+            {
+              "name": "200 OK — Array Profile (Helpdesk)",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "[\n  {\n    \"id\": \"d4e5f6a7-b8c9-0123-defa-234567890123\",\n    \"username\": \"budi@helpdesk.com\",\n    \"full_name\": \"Budi IT Support\",\n    \"role\": \"helpdesk\",\n    \"is_active\": true\n  },\n  {\n    \"id\": \"e5f6a7b8-c9d0-1234-efab-567890123456\",\n    \"username\": \"siti@helpdesk.com\",\n    \"full_name\": \"Siti Network Engineer\",\n    \"role\": \"helpdesk\",\n    \"is_active\": true\n  }\n]"
+            },
+            {
+              "name": "403 Forbidden (Non-Admin)",
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Akses ditolak: role 'user' tidak memiliki izin untuk endpoint ini\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PATCH /users/:id/status (Toggle Aktif/Nonaktif)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/users/{{user_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["users", "{{user_id}}", "status"]
+            },
+            "description": "Toggle status aktif/nonaktif seorang pengguna.\nDilindungi RoleGuard('admin').\n\nJika is_active = false, pengguna tidak bisa login (diblokir di JWT Middleware)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Status Updated",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"id\": \"c3d4e5f6-a7b8-9012-cdef-123456789012\",\n  \"username\": \"dewi@company.com\",\n  \"full_name\": \"Dewi Sartika\",\n  \"role\": \"user\",\n  \"is_active\": false\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🔑 Password Reset (Public)",
+      "item": [
+        {
+          "name": "POST /users/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@helpdesk.com\",\n  \"new_password\": \"newpassword123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/users/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["users", "reset-password"]
+            },
+            "description": "Bypass reset password menggunakan Supabase Admin API.\nEndpoint ini Public (tidak memerlukan JWT)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Password Reset",
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"message\": \"Password berhasil di-reset\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "body": "{\n  \"error\": \"Pengguna dengan email tersebut tidak ditemukan\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

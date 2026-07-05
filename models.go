@@ -7,7 +7,7 @@ package main
 
 // Ticket merepresentasikan tiket helpdesk sesuai tabel public.tickets
 type Ticket struct {
-	ID            string `json:"id"`
+	ID            string `json:"id,omitempty"`
 	Title         string `json:"title"`
 	Description   string `json:"description"`
 	Status        string `json:"status"`
